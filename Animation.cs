@@ -118,7 +118,7 @@ namespace BoneAxisModifier
                 }
             }
 
-            File.WriteAllText(SourceFile.FullName + ".new.json", Json.ToString());
+            File.WriteAllText(SourceFile.FullName, Json.ToString());
         }
     }
 }
