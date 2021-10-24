@@ -17,6 +17,10 @@ namespace BoneAxisModifier
 
         public string Target;
 
+        public string BaseDataKey;
+
+        public int BaseDataIndex;
+
         public decimal Transform;
 
         private JObject Json;
@@ -59,45 +63,62 @@ namespace BoneAxisModifier
             return false;
         }
 
-
-        public bool Modify() // why think harder when you have crtl c, ctrl v
+        public void Modify() // why think harder when you have crtl c, ctrl v
 		{
             JArray boneAnims = (JArray)Json["BoneAnims"];
 
             foreach (JObject anim in boneAnims)
             {
-                if ((string)anim["Name"] == Name)
+                if ((string)anim["Name"] == Name && anim["Curves"] != null)
                 {
                     JArray curves = (JArray)anim["Curves"];
 
                     foreach (JObject curve in curves)
-					{
+                    {
                         if ((string)curve["Target"] == Target)
-						{
-                            foreach (JProperty keyframe in curve["KeyFrames"])
-							{
-                                if (!decimal.TryParse((string)keyframe.Value["Value"], out decimal value))
-                                    return false;
+                        {
+                            // Offset
+                            if (curve["Offset"] != null)
+                            {
+                                if (!decimal.TryParse(curve["Offset"].ToString(), out decimal offset))
+                                    throw new Exception($"Could not parse Offset!");
 
-                                keyframe.Value["Value"] = value + Transform;
-							}
-						}
-					}
+                                curve["Offset"] = offset + Transform;
+                            }
 
-                    Console.WriteLine(anim["BaseData"]["Rotate"]);
-                    string[] rotate = anim["BaseData"]["Rotate"].ToString().Replace(" ", string.Empty).Split(';');
+                            if (curve["KeyFrames"] != null)
+                            {
+                                foreach (JProperty keyframe in curve["KeyFrames"])
+                                {
+                                    if (!decimal.TryParse((string)keyframe.Value["Value"], out decimal value))
+                                        throw new Exception($"Could not parse KeyFrames!");
 
-                    if (!decimal.TryParse(rotate[1], out decimal y))
-                        return false;
+                                    keyframe.Value["Value"] = value + Transform;
+                                }
+                            }
+                        }
+                    }
 
-                    anim["BaseData"]["Rotate"] = $"{rotate[0]};{y + Transform};{rotate[2]}";
+                    if (anim["BaseData"] == null || anim["BaseData"][BaseDataKey] == null)
+                        throw new Exception($"BaseData missing or BaseData->'{BaseDataKey}' missing!");
+
+                    List<decimal> baseData = new() { };
+
+                    foreach (string baseNum in anim["BaseData"][BaseDataKey].ToString().Replace(" ", string.Empty).Split(';'))
+					{
+                        if (!decimal.TryParse(baseNum, out decimal parsedNum))
+                            throw new Exception($"Could not parse BaseData->'{BaseDataKey}'!");
+         
+                        baseData.Add(parsedNum);
+                    }
+
+                    baseData[BaseDataIndex] += Transform;
+
+                    anim["BaseData"][BaseDataKey] = $"{baseData[0]};{baseData[1]};{baseData[2]}";
                 }
             }
 
-            File.WriteAllText(SourceFile.FullName, Json.ToString());
-
-
-            return true;
+            File.WriteAllText(SourceFile.FullName + ".new.json", Json.ToString());
         }
     }
 }
